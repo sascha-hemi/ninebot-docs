@@ -84,9 +84,11 @@ void processBmsResponse(const uint8_t* data, size_t length, uint8_t expectedCmd)
             Serial.println((data[7] << 8) | data[6]);
             break;
 
-    case 0x30:  // Status
-            Serial.println("Status:");
-            Serial.println((data[7] << 8) | data[6], BIN);  // Anzeige als Binär
+    case 0x30:  // Statusbits
+            Serial.println("Statusbits:");
+            for (int i = 0; i < 16; i++) {
+                Serial.println("Bit " + String(i) + ": " + String(((data[7] << 8) | data[6] >> i) & 1));
+            }
             break;
 
     case 0x31:  // Remaining capacity mAh
@@ -100,10 +102,10 @@ void processBmsResponse(const uint8_t* data, size_t length, uint8_t expectedCmd)
             break;
 
     case 0x33:  // Current
-            Serial.print("Current (x10 mA): ");
+            Serial.print("Current (mA): ");
             current = (data[7] << 8) | data[6];
             if (current > 32767) current -= 65536;  // Umrechnung für 16-bit signed
-            Serial.println(current);
+            Serial.println(current*10);
             break;
 
     case 0x34:  // Voltage
@@ -118,6 +120,7 @@ void processBmsResponse(const uint8_t* data, size_t length, uint8_t expectedCmd)
 
     case 0x10: // Fall für Seriennummer
             // Serial.println("Verarbeitung der Seriennummer:");
+            serialNumber = "";
             for (int i = 6; i < length - 2; i++) {
                 serialNumber += (char)data[i]; // Konvertiere jedes Byte zu einem Zeichen und füge es zur Seriennummer hinzu
             }
@@ -159,22 +162,32 @@ bool sendBmsCommand(uint8_t bLen, uint8_t bAddr, uint8_t bCmd, uint8_t bArg, uin
   return false;
 }
 
+void sendAllCommands() {
+  sendBmsCommand(0x03, 0x22, 0x01, 0x40, 0x14);
+  sendBmsCommand(0x03, 0x22, 0x01, 0x10, 0x0E);
+  sendBmsCommand(0x03, 0x22, 0x01, 0x17, 0x02);
+  sendBmsCommand(0x03, 0x22, 0x01, 0x18, 0x02);
+  sendBmsCommand(0x03, 0x22, 0x01, 0x19, 0x02);
+  sendBmsCommand(0x03, 0x22, 0x01, 0x31, 0x02);
+  sendBmsCommand(0x03, 0x22, 0x01, 0x32, 0x02);
+  sendBmsCommand(0x03, 0x22, 0x01, 0x33, 0x02);
+  sendBmsCommand(0x03, 0x22, 0x01, 0x34, 0x02);
+  sendBmsCommand(0x03, 0x22, 0x01, 0x3B, 0x02);
+  sendBmsCommand(0x03, 0x22, 0x01, 0x30, 0x02);
+  sendBmsCommand(0x03, 0x22, 0x01, 0x35, 0x02);
+}
+
 void setup() {
   Serial.begin(115200);
   Serial2.begin(115200, SERIAL_8N1, RXD2, TXD2);
-  sendBmsCommand(0x03, 0x22, 0x01, 0x40, 0x14);  // Abfrage der Zellspannungen
-  sendBmsCommand(0x03, 0x22, 0x01, 0x10, 0x0E);  // Abfrage der Seriennummer
-  sendBmsCommand(0x03, 0x22, 0x01, 0x17, 0x02);  // Abfrage der FirmwareVersion
-  sendBmsCommand(0x03, 0x22, 0x01, 0x18, 0x02);  // Abfrage der FactoryCapacity
-  sendBmsCommand(0x03, 0x22, 0x01, 0x19, 0x02);  // Abfrage der ActualCapacity
-  sendBmsCommand(0x03, 0x22, 0x01, 0x31, 0x02);  // Abfrage der RemainingCapacity in mAh
-  sendBmsCommand(0x03, 0x22, 0x01, 0x32, 0x02);  // Abfrage der RemainingCapacity in % 
-  sendBmsCommand(0x03, 0x22, 0x01, 0x33, 0x02);  // Abfrage des Current
-  sendBmsCommand(0x03, 0x22, 0x01, 0x34, 0x02);  // Abfrage der Voltage
-  sendBmsCommand(0x03, 0x22, 0x01, 0x3B, 0x02);  // Abfrage des Health
-  sendBmsCommand(0x03, 0x22, 0x01, 0x30, 0x02);  // Abfrage des Status
        
 }
 
+
 void loop() {
+  static unsigned long lastMillis = 0;
+  if (millis() - lastMillis >= 10000) {
+    lastMillis = millis();
+    sendAllCommands();
+  }
 }
